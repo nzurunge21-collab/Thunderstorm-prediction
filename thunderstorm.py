@@ -15,33 +15,42 @@ st.set_page_config(
 )
 
 st.title("⛈️ Thunderstorm Prediction App")
-st.write("This web app predicts whether a thunderstorm will occur based on weather data.")
+st.write("This app predicts whether a thunderstorm will occur based on weather data.")
 
 # ================= LOAD DATA =================
 @st.cache_data
 def load_data():
     return pd.read_csv("merged_df_all12k.csv")
 
+# ================= TRAIN MODEL =================
+@st.cache_resource
+def train_model(df):
+    X = df.drop(columns=["TH"])
+    y = df["TH"]
+
+    smote = SMOTE(random_state=42)
+    X_res, y_res = smote.fit_resample(X, y)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_res, y_res, test_size=0.2, random_state=42
+    )
+
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=42
+    )
+    model.fit(X_train, y_train)
+
+    return model, X
+
+# ================= MAIN =================
 try:
     df = load_data()
 except:
-    st.error("❌ Dataset not found. Keep merged_df_all12k.csv in the same folder.")
+    st.error("❌ merged_df_all12k.csv not found. Keep it in the same folder as app.py")
     st.stop()
 
-# ================= PREPARE DATA =================
-X = df.drop(columns=["TH"])
-y = df["TH"]
-
-smote = SMOTE(random_state=42)
-X_res, y_res = smote.fit_resample(X, y)
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X_res, y_res, test_size=0.2, random_state=42
-)
-
-# ================= TRAIN MODEL =================
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+model, X = train_model(df)
 
 # ================= USER INPUT =================
 st.subheader("📥 Enter Weather Parameters")
@@ -49,10 +58,10 @@ st.subheader("📥 Enter Weather Parameters")
 user_input = {}
 for col in X.columns:
     user_input[col] = st.slider(
-        col,
-        float(X[col].min()),
-        float(X[col].max()),
-        float(X[col].mean())
+        label=col,
+        min_value=float(X[col].min()),
+        max_value=float(X[col].max()),
+        value=float(X[col].mean())
     )
 
 input_df = pd.DataFrame([user_input])
@@ -71,3 +80,4 @@ if st.button("🔮 Predict Thunderstorm"):
 
 st.markdown("---")
 st.caption("Developed by Nandini Zurunge")
+
